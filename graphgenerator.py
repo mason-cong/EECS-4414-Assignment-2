@@ -1,8 +1,10 @@
 import networkx as nx
 import igraph as ig
+import itertools
 import json
 import random
 
+#create graphs for dblp2005 and dblp2006
 def graph_generators():
         fileName = "dblp_coauthorship.json"
         data = json.load(open(fileName))
@@ -22,10 +24,13 @@ def graph_generators():
                 elif (year == 2006):
                         dblp2006.add_edge(auth1, auth2)
 
-        graph_gcc(dblp2005, "dblp2005")
+        #used for part d, can commment out if not necessary for calculation
+        detectCommunities(dblp2005)
+
+        #graph_gcc(dblp2005, "dblp2005")
         #graph_gcc(dblp2006, "dblp2006") #comment this out when doing fof calculation
 
-
+#giant connected component of graph
 def graph_gcc(G, fileName):
         gcc = max(nx.connected_components(G), key=len)
         gcc_graph = G.subgraph(gcc).copy()
@@ -36,8 +41,11 @@ def graph_gcc(G, fileName):
         
         file.close()
 
+        #part b calculations, can comment out if not needed to calculate
         #pageRankCalc(gcc_graph, fileName)
         #edgeBetweennessCalc(gcc_graph, fileName)
+
+        #part c calculation, used for dblp2005
         core_graph(gcc_graph, fileName)
 
 def pageRankCalc(G, fileName):
@@ -52,8 +60,8 @@ def pageRankCalc(G, fileName):
         file.close()
 
 def edgeBetweennessCalc(G, fileName):
-        #pagerank calculation
         file = open("edge_betweenness" + fileName, "w")
+        #use k size 10000 to reduce size of nodes, and reduce computation time
         sorted_betweenness = sorted(nx.edge_betweenness_centrality(G, k = 10000).items(), reverse = True)
 
         for x in range(20):
@@ -93,7 +101,7 @@ def findTEdges(G2005, G2006):
         file = open("t_edges_", "wb")
         
         for x in G2006.edges():
-                if not G2005.edges(*x):
+                if not G2005.has_edge(*x):
                         edgeGraph.add_edge(*x)
 
         nx.write_edgelist(edgeGraph, file, delimiter="*")
@@ -103,14 +111,16 @@ def findTEdges(G2005, G2006):
 #C. V. predicted edges
 def random_edge():
         file = open("fof_edges_dblp2005", "rb")
-        G = nx.read_edgelist(file)
+        G = nx.read_edgelist(file, delimiter="*")
         file.close()
 
         randG = nx.Graph()
         edges = list(G.edges())
 
         for x in range(252968):
-                randG.add_edge(random.choice(edges))
+                cur_edge = random.choice(edges)
+                randG.add_edge(*cur_edge)
+
         write_file = open("random_edgelist_dblp2005", "wb")
         nx.write_edgelist(randG, write_file, delimiter="*")
         write_file.close()
@@ -126,7 +136,7 @@ def common_neighbor_edge():
 
         predictG = nx.Graph()
         for x in fof.edges():
-                predictG.add_edge(x, score = len(nx.common_neighbors(x, G2005)))
+                predictG.add_edge(*x, score=len(nx.common_neighbors(G2005, *x)))
         write_file = open("common_neighbors_edgelist", "wb")
         nx.write_edgelist(predictG, write_file, delimiter="*")
         write_file.close()
@@ -181,7 +191,7 @@ def adamic_edge():
         for u, v, p in prediction:
                 predictAdamic.add_edge(u, v, score = p)
 
-        write_file = open("pref_attach_edgelist", "wb")
+        write_file = open("adamic_adar_edgelist", "wb")
         nx.write_edgelist(predictAdamic, write_file, delimiter="*")
         write_file.close()
 
@@ -195,27 +205,84 @@ def precision(fileName, k):
         file.close()
 
         edges = nx.get_edge_attributes(G, "score")
-        k_values = sorted(edges.items(), key = lambda x:-x[1][:k])
+        k_values = sorted(edges.items(), key = lambda x:-x[1])[:k]
 
         predicted = 0
         for val in k_values:
-                if T.has_edge(val[0]):
+                if T.has_edge(*val[0]):
                                 predicted += 1
 
-        write_file = open("k_" + fileName, "ab+")
-        print ("K Value: %s, Predicted Value: %s", k, predicted)
+        write_file = open("k_" + fileName, "a+")
+        write_file.write("K Value: %s, Predicted Value: %s\n" % (k, (predicted/k)))
         write_file.close()
 
-#graph_generators()
-print(1)
+#part d
+def detectCommunities(G):
+	communitySizes = []
+	k = 10	#itertools value, first k tuple of communities
+	comp = nx.community.girvan_newman(G)
+	limited = itertools.takewhile(lambda c: len(c) <= k, comp)
+	for communities in limited:
+		if len(communities) == k:	
+			for community in communities:
+				communitySizes.append(len(community))
+	saveCommunities(sorted(communitySizes, reverse=True))
+
+def saveCommunities(communityLengths):
+	file = open("dblp_communities.txt", "w")
+	file.write(str(communityLengths))
+	file.close()
+
+
+
+graph_generators()
+
 file = open("coregraph_dblp2005", "rb")
 G2005 = nx.read_edgelist(file, delimiter="*")
 file.close()
-print(1)
+
 file = open("coregraph_dblp2006", "rb")
 G2006 = nx.read_edgelist(file, delimiter="*")
 file.close()
-print(1)
-findTEdges(G2005, G2006)
-print(1)
+
+#findTEdges(G2005, G2006)
+#random_edge()
 #common_neighbor_edge()
+#jaccard_edge()		
+#pref_attach_edge()
+#adamic_edge()
+
+#random predict
+#precision("random_edgelist_dblp2005", k = 10)
+#precision("random_edgelist_dblp2005", k = 20)
+#precision("random_edgelist_dblp2005", k = 50)
+#precision("random_edgelist_dblp2005", k = 100)
+#precision("random_edgelist_dblp2005", k = 252968)
+
+#common neighbor
+#precision("common_neighbors_edgelist", k = 10)
+#precision("common_neighbors_edgelist", k = 20)
+#precision("common_neighbors_edgelist", k = 50)
+#precision("common_neighbors_edgelist", k = 100)
+#precision("common_neighbors_edgelist", k = 252968)
+
+#jaccard
+#precision("jaccard_coefficient_edgelist", k = 10)
+#precision("jaccard_coefficient_edgelist", k = 20)
+#precision("jaccard_coefficient_edgelist", k = 50)
+#precision("jaccard_coefficient_edgelist", k = 100)
+#precision("jaccard_coefficient_edgelist", k = 252968)
+
+#pref attach
+#precision("pref_attach_edgelist", k = 10)
+#precision("pref_attach_edgelist", k = 20)
+#precision("pref_attach_edgelist", k = 50)
+#precision("pref_attach_edgelist", k = 100)
+#precision("pref_attach_edgelist", k = 252968)
+
+#adamic adar
+#precision("adamic_adar_edgelist", k = 10)
+#precision("adamic_adar_edgelist", k = 20)
+#precision("adamic_adar_edgelist", k = 50)
+#precision("adamic_adar_edgelist", k = 100)
+#precision("adamic_adar_edgelist", k = 252968)
