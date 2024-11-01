@@ -49,7 +49,7 @@ def graph_gcc(G, fileName):
         edgeBetweennessCalc(gcc_graph, fileName)
 
         #part c calculation, used for dblp2005
-        #core_graph(gcc_graph, fileName)
+        core_graph(gcc_graph, fileName)
 
 def pageRankCalc(G, fileName):
         #pagerank calculation
